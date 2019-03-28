@@ -1,22 +1,22 @@
 //
 //  DemoViewController.swift
-//  SwiftR
+//  SwiftR Mac Demo
 //
-//  Created by Adam Hartford on 5/26/16.
+//  Created by Tadd on 12/20/16.
 //  Copyright © 2016 Adam Hartford. All rights reserved.
 //
 
-import UIKit
+import Foundation
 import SwiftR
 
-class DemoViewController: UIViewController {
+class DemoViewController: NSViewController {
     
-    @IBOutlet weak var sendButton: UIButton!
-    @IBOutlet weak var messageTextField: UITextField!
-    @IBOutlet weak var chatTextView: UITextView!
-    @IBOutlet weak var statusLabel: UILabel!
-    @IBOutlet weak var startButton: UIBarButtonItem!
-    
+    @IBOutlet weak var sendButton: NSButton!
+	@IBOutlet weak var messageTextField: NSTextField!
+	@IBOutlet var chatTextView: NSTextView!
+	@IBOutlet weak var statusLabel: NSTextField!
+	@IBOutlet weak var startButton: NSButton!
+	
     var chatHub: Hub!
     var connection: SignalR!
     var name: String!
@@ -30,8 +30,8 @@ class DemoViewController: UIViewController {
         
         chatHub = Hub("chatHub")
         chatHub.on("broadcastMessage") { [weak self] args in
-            if let name = args?[0] as? String, let message = args?[1] as? String, let text = self?.chatTextView.text {
-                self?.chatTextView.text = "\(text)\n\n\(name): \(message)"
+            if let name = args?[0] as? String, let message = args?[1] as? String, let text = self?.chatTextView.string {
+                self?.chatTextView.string = "\(text)\n\n\(name): \(message)"
             }
         }
         connection.addHub(chatHub)
@@ -39,34 +39,34 @@ class DemoViewController: UIViewController {
          // SignalR events
         
         connection.starting = { [weak self] in
-            self?.statusLabel.text = "Starting..."
+            self?.statusLabel.stringValue = "Starting..."
             self?.startButton.isEnabled = false
             self?.sendButton.isEnabled = false
         }
 
         connection.reconnecting = { [weak self] in
-            self?.statusLabel.text = "Reconnecting..."
+            self?.statusLabel.stringValue = "Reconnecting..."
             self?.startButton.isEnabled = false
             self?.sendButton.isEnabled = false
         }
 
         connection.connected = { [weak self] in
             print("Connection ID: \(self!.connection.connectionID!)")
-            self?.statusLabel.text = "Connected"
+            self?.statusLabel.stringValue = "Connected"
             self?.startButton.isEnabled = true
             self?.startButton.title = "Stop"
             self?.sendButton.isEnabled = true
         }
 
         connection.reconnected = { [weak self] in
-            self?.statusLabel.text = "Reconnected. Connection ID: \(self!.connection.connectionID!)"
+            self?.statusLabel.stringValue = "Reconnected. Connection ID: \(self!.connection.connectionID!)"
             self?.startButton.isEnabled = true
             self?.startButton.title = "Stop"
             self?.sendButton.isEnabled = true
         }
 
         connection.disconnected = { [weak self] in
-            self?.statusLabel.text = "Disconnected"
+            self?.statusLabel.stringValue = "Disconnected"
             self?.startButton.isEnabled = true
             self?.startButton.title = "Start"
             self?.sendButton.isEnabled = false
@@ -75,7 +75,7 @@ class DemoViewController: UIViewController {
         connection.connectionSlow = { print("Connection slow...") }
 
         connection.error = { [weak self] error in
-            print("Error: \(String(describing: error))")
+            print("Error: \(error)")
 
             // Here's an example of how to automatically reconnect after a timeout.
             //
@@ -92,39 +92,46 @@ class DemoViewController: UIViewController {
         connection.start()
     }
     
-    override func viewDidAppear(_ animated: Bool) {
-        let alertController = UIAlertController(title: "Name", message: "Please enter your name", preferredStyle: .alert)
+    override func viewDidAppear() {
+        super.viewDidAppear()
         
-        let okAction = UIAlertAction(title: "OK", style: .default) { [weak self] _ in
-            self?.name = alertController.textFields?.first?.text
-            
-            if let name = self?.name , name.isEmpty {
-                self?.name = "Anonymous"
-            }
-            
-            alertController.textFields?.first?.resignFirstResponder()
-        }
-        
-        alertController.addTextField { textField in
-            textField.placeholder = "Your Name"
-        }
-        
-        alertController.addAction(okAction)
-        present(alertController, animated: true, completion: nil)
+		let popup = NSAlert()
+		popup.messageText = "Name"
+		popup.informativeText = "Please enter your name"
+		popup.alertStyle = NSAlertStyle.informational
+		popup.addButton(withTitle: "OK")
+		
+		let inputTextField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+		inputTextField.placeholderString = "Your Name"
+		popup.accessoryView = inputTextField
+		
+		
+		popup.beginSheetModal(for: view.window!, completionHandler: { (modalResponse) -> Void in
+			if modalResponse == NSAlertFirstButtonReturn {
+				self.name = inputTextField.stringValue
+				if let name = self.name , name.isEmpty {
+					self.name = "Anonymous"
+				}
+				print("Entered name = \"\(self.name)\"")
+				inputTextField.resignFirstResponder()
+			}
+		})
     }
 
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
-    
     @IBAction func send(_ sender: AnyObject?) {
-        if let hub = chatHub, let message = messageTextField.text {
-            do {
-                try hub.invoke("send", arguments: [name, message])
-            } catch {
-                print(error)
-            }
+		guard name != nil else {
+			print("Cannot send, name is nil!")
+			return
+		}
+		
+		if let hub = chatHub {
+			let message = messageTextField.stringValue
+			do {
+				try hub.invoke("send", arguments: [name, message])
+			}
+			catch {
+				print(error)
+			}
         }
         messageTextField.resignFirstResponder()
     }
@@ -136,15 +143,4 @@ class DemoViewController: UIViewController {
             connection.stop()
         }
     }
-
-    /*
-    // MARK: - Navigation
-
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
-    }
-    */
-
 }

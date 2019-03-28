@@ -20,7 +20,8 @@ Either, your choice. Note that since WKWebView runs in a separate process, it do
 
 ```swift
 // Client
-SwiftR.useWKWebView = true
+let connection = SignalR("https://swiftr.azurewebsites.net")
+connection.useWKWebView = true
 ```
 
 Also when using WKWebView, make sure to enable CORS on your server:
@@ -32,20 +33,30 @@ app.UseCors (CorsOptions.AllowAll);
 // See my SignalRApplication repo for a CORS example with ASP.NET Core.
 ```
 
-### What versions of SignalR are supported?
+#### How to set Origin
 
-SwiftR supports SignalR version 2.x. Version 2.2.1 is assumed by default. To change the SignalR version:
+If allowing all origins (`*`) is not acceptable, you can specify an allowed origin via the `originUrlString` property.
 
 ```swift
-SwiftR.signalRVersion = .v2_2_1
-//SwiftR.signalRVersion = .v2_2_0
-//SwiftR.signalRVersion = .v2_1_2
-//SwiftR.signalRVersion = .v2_1_1
-//SwiftR.signalRVersion = .v2_1_0
-//SwiftR.signalRVersion = .v2_0_3
-//SwiftR.signalRVersion = .v2_0_2
-//SwiftR.signalRVersion = .v2_0_1
-//SwiftR.signalRVersion = .v2_0_0
+connection.originUrlString = "http://www.example.com"
+```
+
+### What versions of SignalR are supported?
+
+SwiftR supports SignalR version 2.x. Version 2.2.2 is assumed by default. To change the SignalR version:
+
+```swift
+let connection = SignalR("https://swiftr.azurewebsites.net")
+connection.signalRVersion = .v2_2_2
+//connection.signalRVersion = .v2_2_1
+//connection.signalRVersion = .v2_2_0
+//connection.signalRVersion = .v2_1_2
+//connection.signalRVersion = .v2_1_1
+//connection.signalRVersion = .v2_1_0
+//connection.signalRVersion = .v2_0_3
+//connection.signalRVersion = .v2_0_2
+//connection.signalRVersion = .v2_0_1
+//connection.signalRVersion = .v2_0_0
 ```
 
 ### Installation
@@ -81,16 +92,17 @@ public class SimpleHub : Hub
 Default parameter names in callback response:
 ```swift
 // Client
-SwiftR.connect("http://localhost:8080") { connection in
-    let simpleHub = connection.createHubProxy("simpleHub")
-  
-    // Event handler
-    simpleHub.on("notifySimple") { args in
-        let message = args![0] as! String
-        let detail = args![1] as! String
-        print("Message: \(message)\nDetail: \(detail)")
-    }
+let connection = SignalR("http://localhost:5000")
+
+let simpleHub = Hub("simpleHub")
+simpleHub.on("notifySimple") { args in
+    let message = args![0] as! String
+    let detail = args![1] as! String
+    print("Message: \(message)\nDetail: \(detail)")
 }
+
+connection.addHub(simpleHub)
+connection.start()
 
 ...
 
@@ -134,16 +146,16 @@ public class ComplexHub : Hub
 
 ```swift
 // Client
-var complexHub: Hub!
+let connection = SignalR("http://localhost:5000")
 
-SwiftR.connect("http://localhost:8080") { [weak self] connection in
-    self?.complexHub = connection.createHubProxy("complexHub")
-    
-    self?.complexHub.on("notifyComplex") { args in
-        let m: AnyObject = args![0] as AnyObject!
-        print(m)
-    }
+let complexHub = Hub("complexHub")
+complexHub.on("notifyComplex") { args in
+    let m: AnyObject = args![0] as AnyObject!
+    print(m)
 }
+
+connection.addHub(complexHub)
+connection.start()
 
 ...
 
@@ -176,13 +188,11 @@ public class MyConnection : PersistentConnection
 
 ```swift
 // Client
-var persistentConnection: SignalR!
-
-persistentConnection = SwiftR.connect("http://localhost:8080/echo", connectionType: .persistent) { connection in
-    connection.received = { data in
-        print(data!)
-    }
+let persistentConnection = SignalR("http://localhost:8080/echo", connectionType: .persistent)
+persistentConnection.received = { data in
+    print(data)
 }
+persistentConnection.start()
 
 // Send data
 persistentConnection.send("Persistent Connection Test")
@@ -193,11 +203,12 @@ persistentConnection.send("Persistent Connection Test")
 By default, SignalR will choose the best transport available to you. You can also specify the transport method:
 
 ```swift
-SwiftR.transport = .auto // This is the default
-SwiftR.transport = .webSockets
-SwiftR.transport = .serverSentEvents
-SwiftR.transport = .foreverFrame
-SwiftR.transport = .longPolling
+let connection = SignalR("https://swiftr.azurewebsites.net")
+connection.transport = .auto // This is the default
+connection.transport = .webSockets
+connection.transport = .serverSentEvents
+connection.transport = .foreverFrame
+connection.transport = .longPolling
 ```
 
 ### Connection Lifetime Events
@@ -205,16 +216,14 @@ SwiftR.transport = .longPolling
 SwiftR exposes the following SignalR events:
 
 ```swift
-SwiftR.connect("http://localhost:8080") { connection in
-    ...
-    
-    connection.started = { print("started") }
-    connection.connected = { print("connected: \(connection.connectionID)") }
-    connection.connectionSlow = { print("connectionSlow") }
-    connection.reconnecting = { print("reconnecting") }
-    connection.reconnected = { print("reconnected") }
-    connection.disconnected = { print("disconnected") }
-}
+let connection = SignalR("http://swiftr.azurewebsites.net")
+connection.started = { print("started") }
+connection.connected = { print("connected: \(connection.connectionID)") }
+connection.connectionSlow = { print("connectionSlow") }
+connection.reconnecting = { print("reconnecting") }
+connection.reconnected = { print("reconnected") }
+connection.disconnected = { print("disconnected") }
+connection.start()
 ```
 
 ### Reconnecting
@@ -226,8 +235,8 @@ connection.disconnected = {
     print("Disconnected...")
     
     // Try again after 5 seconds
-    let delayTime = dispatch_time(DISPATCH_TIME_NOW, Int64(5 * Double(NSEC_PER_SEC)))
-    dispatch_after(delayTime, dispatch_get_main_queue()) {
+    let delayTime = DispatchTime.now() + .seconds(5)
+    DispatchQueue.main.asyncAfter(deadline: delayTime) { [weak self] in
         connection.start()
     }
 }
@@ -238,46 +247,26 @@ connection.disconnected = {
 Use the `stop()` and `start()` methods to manage connections manually.
 
 ```swift
-var myConnection: SignalR!
-
-myConnection = SwiftR.connect("http://localhost:8080") { connection in
-    let simpleHub = connection.createHubProxy("simpleHub")
-  
-    // Event handler
-    simpleHub.on("notifySimple") { args in
-        let message = args![0] as! String
-        let detail = args![1] as! String
-        print("Message: \(message)\nDetail: \(detail)")
-    }
-}
+let connection  = SignalR("https://swiftr.azurewebsites.net")
+connection.start()
+connection.stop()
 
 ...
 
-if myConnection.state == .connected {
-    myConnection.stop()
-} else if myConnection.state == .disonnected {
-    myConnection.start()
+if connection.state == .connected {
+    connection.stop()
+} else if connection.state == .disonnected {
+    connection.start()
 }
-
-... // Or...
-
-SwiftR.stopAll()
-SwiftR.startAll()
 ```
 
 ### Connection State
 
 ```swift
 public enum State {
-    case Connecting
-    case Connected
-    case Disconnected
-}
-
-...
-
-if myConnection.state == .connecting {
-    // Do something...
+    case connecting
+    case connected
+    case disconnected
 }
 
 ```
@@ -287,19 +276,15 @@ if myConnection.state == .connecting {
 #### Query String
 
 ```swift
-SwiftR.connect("http://localhost:8080") { connection in
-    connection.queryString = ["foo": "bar"]
-    ...
-}
+let connection = SignalR("https://swiftr.azurewebsites.net")
+connection.queryString = ["foo": "bar"]
 ```
 
 #### Custom Headers (Non-WebSocket Only)
 
 ```swift
-SwiftR.connect("http://localhost:8080") { connection in
-    connection.headers = ["X-MyHeader1": "Value1", "X-MyHeader2", "Value2"]
-    ...
-}
+let connection = SignalR("https://swiftr.azurewebsites.net")
+connection.headers = ["X-MyHeader1": "Value1", "X-MyHeader2", "Value2"]
 ```
 
 #### Cookies (UIWebView Only)
