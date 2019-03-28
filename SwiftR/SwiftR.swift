@@ -488,11 +488,13 @@ open class Hub: NSObject {
     var invokeHandlers: [String: (_ result: Any?, _ error: AnyObject?) -> ()] = [:]
     var connection: SignalR!
     
+    @objc(initWithName:)
     public init(_ name: String) {
         self.name = name
         self.connection = nil
     }
     
+    @objc(initWithName:connection:)
     init(name: String, connection: SignalR) {
         self.name = name
         self.connection = connection
